@@ -1,21 +1,6 @@
 "use strict";
 
 const EventEmitter = require("node:events");
-const secretboxMethods = (() => {
-  const fallbackError = () => {
-    throw new Error(
-      "Cannot play audio as no valid encryption package is installed.\n" +
-        "  - Install sodium, libsodium-wrappers, or tweetnacl.\n" +
-        "  - Use the generateDependencyReport() function for more information.\n"
-    );
-  };
-  return {
-    __proto__: null,
-    open: fallbackError,
-    close: fallbackError,
-    randomBytes: fallbackError
-  };
-})();
 const VoiceUDPSocket = require("./udp.js");
 const VoiceWebSocket = require("./ws.js");
 
@@ -70,6 +55,22 @@ const VoiceOpcode = new Proxy(
     }
   }
 );
+
+const secretboxMethods = (() => {
+  const fallbackError = () => {
+    throw new Error(
+      "Cannot play audio as no valid encryption package is installed.\n" +
+        "  - Install sodium, libsodium-wrappers, or tweetnacl.\n" +
+        "  - Use the generateDependencyReport() function for more information.\n"
+    );
+  };
+  return {
+    __proto__: null,
+    open: fallbackError,
+    close: fallbackError,
+    randomBytes: fallbackError
+  };
+})();
 
 const noop = Object.freeze(Object.setPrototypeOf(() => void 0, null));
 
@@ -371,4 +372,4 @@ function setEncryptionMethods(methods) {
   if (typeof methods?.randomBytes == "function") secretboxMethods.randomBytes = methods.randomBytes;
 }
 
-Object.assign(exports, { Networking, NetworkingStatusCode, VoiceOpcode, setEncryptionMethods });
+Object.assign(exports, { Networking, NetworkingStatusCode, VoiceOpcode, setEncryptionMethods, VoiceUDPSocket, VoiceWebSocket });

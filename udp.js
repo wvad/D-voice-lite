@@ -9,26 +9,21 @@ const KEEP_ALIVE_LIMIT = 12;
 const MAX_COUNTER_VALUE = 2 ** 32 - 1;
 
 class VoiceUDPSocket extends EventEmitter {
-  #socket;
-  #keepAlives;
-  #keepAliveCounter;
-  #keepAliveBuffer;
-  #keepAliveInterval;
+  #socket = createSocket("udp4");
+  #keepAlives = [];
+  #keepAliveCounter = 0;
+  #keepAliveBuffer = Buffer.alloc(8);
+  #keepAliveInterval = setInterval(() => this.#keepAlive(), KEEP_ALIVE_INTERVAL);
+  ping = NaN;
   constructor(remoteIp, remotePort) {
     if (typeof remoteIp !== "string") throw new TypeError("Remote IP must be a string");
     if (typeof remotePort !== "number") throw new TypeError("Remote port must be a number");
     super();
-    this.ping = NaN;
     Object.defineProperty(this, "remoteIp", { value: remoteIp, enumerable: true });
     Object.defineProperty(this, "remotePort", { value: remotePort, enumerable: true });
-    this.#socket = createSocket("udp4");
     this.#socket.on("error", error => this.emit("error", error));
     this.#socket.on("message", buffer => this.#onMessage(buffer));
     this.#socket.on("close", () => this.emit("close"));
-    this.#keepAlives = [];
-    this.#keepAliveCounter = 0;
-    this.#keepAliveBuffer = Buffer.alloc(8);
-    this.#keepAliveInterval = setInterval(() => this.#keepAlive(), KEEP_ALIVE_INTERVAL);
     setImmediate(() => this.#keepAlive());
   }
   send(buffer) {

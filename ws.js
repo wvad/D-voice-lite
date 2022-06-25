@@ -5,22 +5,19 @@ const WebSocket = require("./websocket");
 
 class VoiceWebSocket extends EventEmitter {
   #ws;
-  #lastHeartbeatAck;
-  #lastHeartbeatSend;
-  #missedHeartbeats;
+  #lastHeartbeatAck = 0;
+  #lastHeartbeatSend = 0;
+  #missedHeartbeats = 0;
   #heartbeatInterval;
+  ping = NaN;
   constructor(address) {
     if (typeof address !== "string") throw new TypeError("Address must be a string");
     super();
-    this.ping = NaN;
     this.#ws = new WebSocket(address);
     this.#ws.onmessage = e => this.#onMessage(e);
     this.#ws.onopen = e => this.emit("open", e);
     this.#ws.onerror = e => this.emit("error", e instanceof Error ? e : e.error);
     this.#ws.onclose = e => this.emit("close", e);
-    this.#lastHeartbeatAck = 0;
-    this.#lastHeartbeatSend = 0;
-    this.#missedHeartbeats = 0;
   }
   sendPacket(packet) {
     try {

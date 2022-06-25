@@ -64,8 +64,6 @@ client.once("ready", async () => {
   }
   console.timeEnd("[DEBUG] voice gateway");
 
-  if (networking.state.code !== NetworkingStatusCode.Ready) throw 0;
-
   // Wait for opus encoding
   console.time("[DEBUG] opus packets");
   const opusPackets = await opusPacketsPromise;

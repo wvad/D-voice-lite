@@ -1,6 +1,24 @@
-import VoiceWebSocket from "./ws";
-import VoiceUDPSocket from "./udp";
 import EventEmitter from "node:events";
+
+export class VoiceWebSocket extends EventEmitter {
+  public constructor(address: string);
+  public ping: number;
+  public sendPacket(packet: { op: number; d: unknown }): void;
+  public destroy(): void;
+}
+
+export class VoiceUDPSocket extends EventEmitter {
+  public constructor(remoteIp: string, remotePort: number);
+  public ping: number;
+  public readonly remoteIp: string;
+  public readonly remotePort: number;
+  public send(buffer: Uint8Array | string | ReadonlyArray<any>): void;
+  public destroy(): void;
+  private performIPDiscovery(ssrc: number): Promise<{
+    readonly ip: string;
+    readonly port: number;
+  }>;
+}
 
 export enum NetworkingStatusCode {
   OpeningWs = "OPENING_WS",
