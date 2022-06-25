@@ -1,16 +1,21 @@
 // Module imports
-import { ConnectionOptions, Networking, NetworkingStatusCode } from ".";
+import { Networking, NetworkingStatusCode, setEncryptionMethods } from ".";
 import { BaseGuildVoiceChannel, Client, Intents } from "discord.js";
 import { FFmpeg, opus } from "prism-media";
 import { createReadStream } from "node:fs";
+import tweetnacl from "tweetnacl";
 
+setEncryptionMethods({
+  open: tweetnacl.secretbox.open,
+  close: tweetnacl.secretbox,
+  randomBytes: tweetnacl.randomBytes
+});
 
 // Interface declarations
 interface DiscordGatewayAdapter {
   sendPayload(payload: unknown): boolean;
   destroy(): void;
 }
-
 
 // Constants definitions
 const client = new Client({
@@ -27,14 +32,13 @@ const opusPacketsPromise = new Promise<Buffer[]>(resolve => {
   audioStream.on("end", () => resolve(packets));
 });
 
-
 // Ready Event Handler (Discord.js)
 console.time("[DEBUG] client ready");
 client.once("ready", async () => {
   console.timeEnd("[DEBUG] client ready");
 
   // Get a voice channel
-  const channel = client.channels.cache.get("854340921445711904");
+  const channel = client.channels.cache.get("970331022921179136");
   if (!channel?.isVoice()) throw new Error("The channel is not a voice channel");
 
   // Get authentication information for Discord Voice Gateway
@@ -47,12 +51,20 @@ client.once("ready", async () => {
   console.debug("[DEBUG] connecting to Voice Gateway");
   console.time("[DEBUG] voice gateway");
   const networking = new Networking(options);
+  networking.on("stateChange", () => {
+    console.log(
+      require("util").inspect(networking, { colors: true, depth: Infinity, showHidden: true }),
+      require("util").inspect(networking.state, { colors: true, depth: Infinity, showHidden: true })
+    );
+  });
 
   // Wait for the RTP connection to be ready
   if (networking.state.code !== NetworkingStatusCode.Ready) {
     await new Promise(r => networking.once(NetworkingStatusCode.Ready, r));
   }
   console.timeEnd("[DEBUG] voice gateway");
+
+  if (networking.state.code !== NetworkingStatusCode.Ready) throw 0;
 
   // Wait for opus encoding
   console.time("[DEBUG] opus packets");
@@ -61,7 +73,7 @@ client.once("ready", async () => {
 
   // Send an audio stream to Discord
   let next = Date.now();
-  let preparedPacket: Buffer | undefined;
+  let preparedPacket: Uint8Array | undefined;
   function audioCycleStep() {
     next += 20;
     if (preparedPacket) networking.sendEncryptedPacket(preparedPacket);
@@ -73,14 +85,21 @@ client.once("ready", async () => {
   setImmediate(audioCycleStep);
 });
 
-
 // Login to Discord
 client.login();
 
-
 // Function definitions
 function fetchVoiceGatewayInfo(vc: BaseGuildVoiceChannel) {
-  return new Promise<{ options: ConnectionOptions; adapter: DiscordGatewayAdapter }>((resolve, reject) => {
+  return new Promise<{
+    options: {
+      endpoint: string;
+      serverId: string;
+      token: string;
+      sessionId: string;
+      userId: string;
+    };
+    adapter: DiscordGatewayAdapter;
+  }>((resolve, reject) => {
     let statePackets: any;
     const adapter = vc.guild.voiceAdapterCreator({
       onVoiceServerUpdate(data) {

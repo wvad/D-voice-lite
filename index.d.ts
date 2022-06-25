@@ -1,5 +1,5 @@
-import { VoiceWebSocket } from "./ws";
-import { VoiceUDPSocket } from "./udp";
+import VoiceWebSocket from "./ws";
+import VoiceUDPSocket from "./udp";
 import EventEmitter from "node:events";
 
 export enum NetworkingStatusCode {
@@ -28,7 +28,7 @@ export enum VoiceOpcode {
   Codec = 14
 }
 
-export interface ConnectionOptions {
+declare interface ConnectionOptions {
   serverId: string;
   userId: string;
   sessionId: string;
@@ -36,7 +36,7 @@ export interface ConnectionOptions {
   endpoint: string;
 }
 
-export interface ConnectionData {
+declare interface ConnectionData {
   ssrc: number;
   encryptionMode: string;
   secretKey: Uint8Array;
@@ -47,49 +47,49 @@ export interface ConnectionData {
   speaking: boolean;
 }
 
-export interface NetworkingOpeningWsState {
-  code: NetworkingStatusCode.OpeningWs;
-  ws: VoiceWebSocket;
+declare interface NetworkingOpeningWsState {
+  readonly code: NetworkingStatusCode.OpeningWs;
+  readonly ws: VoiceWebSocket;
 }
 
-export interface NetworkingIdentifyingState {
-  code: NetworkingStatusCode.Identifying;
-  ws: VoiceWebSocket;
+declare interface NetworkingIdentifyingState {
+  readonly code: NetworkingStatusCode.Identifying;
+  readonly ws: VoiceWebSocket;
 }
 
-export interface NetworkingUdpHandshakingState {
-  code: NetworkingStatusCode.UdpHandshaking;
-  ws: VoiceWebSocket;
-  udp: VoiceUDPSocket;
-  connectionData: Pick<ConnectionData, "ssrc">;
+declare interface NetworkingUdpHandshakingState {
+  readonly code: NetworkingStatusCode.UdpHandshaking;
+  readonly ws: VoiceWebSocket;
+  readonly udp: VoiceUDPSocket;
+  readonly connectionData: Pick<ConnectionData, "ssrc">;
 }
 
-export interface NetworkingSelectingProtocolState {
-  code: NetworkingStatusCode.SelectingProtocol;
-  ws: VoiceWebSocket;
-  udp: VoiceUDPSocket;
-  connectionData: Pick<ConnectionData, "ssrc">;
+declare interface NetworkingSelectingProtocolState {
+  readonly code: NetworkingStatusCode.SelectingProtocol;
+  readonly ws: VoiceWebSocket;
+  readonly udp: VoiceUDPSocket;
+  readonly connectionData: Pick<ConnectionData, "ssrc">;
 }
 
-export interface NetworkingReadyState {
-  code: NetworkingStatusCode.Ready;
-  ws: VoiceWebSocket;
-  udp: VoiceUDPSocket;
-  connectionData: ConnectionData;
+declare interface NetworkingReadyState {
+  readonly code: NetworkingStatusCode.Ready;
+  readonly ws: VoiceWebSocket;
+  readonly udp: VoiceUDPSocket;
+  readonly connectionData: ConnectionData;
 }
 
-export interface NetworkingResumingState {
-  code: NetworkingStatusCode.Resuming;
-  ws: VoiceWebSocket;
-  udp: VoiceUDPSocket;
-  connectionData: ConnectionData;
+declare interface NetworkingResumingState {
+  readonly code: NetworkingStatusCode.Resuming;
+  readonly ws: VoiceWebSocket;
+  readonly udp: VoiceUDPSocket;
+  readonly connectionData: ConnectionData;
 }
 
-export interface NetworkingClosedState {
-  code: NetworkingStatusCode.Closed;
+declare interface NetworkingClosedState {
+  readonly code: NetworkingStatusCode.Closed;
 }
 
-export type NetworkingState =
+declare type NetworkingState =
   | NetworkingOpeningWsState
   | NetworkingIdentifyingState
   | NetworkingUdpHandshakingState
@@ -98,13 +98,21 @@ export type NetworkingState =
   | NetworkingResumingState
   | NetworkingClosedState;
 
-export class Networking extends EventEmitter {
-  public constructor(options: ConnectionOptions);
-  public readonly connectionOptions: ConnectionOptions;
+declare interface EncryptionMethods {
+  open: (buffer: Buffer, nonceBuffer: Buffer, secretKey: Uint8Array) => Uint8Array | null;
+  close: (opusPacket: Buffer, nonceBuffer: Buffer, secretKey: Uint8Array) => Uint8Array;
+  randomBytes: (number: number, nonceBuffer: Buffer) => Uint8Array;
+}
+
+export class Networking<T extends ConnectionOptions> extends EventEmitter {
+  public constructor(options: T);
+  public readonly connectionOptions: T;
   public get state(): NetworkingState;
   public destroy(): void;
-  public encryptAudioPacket(opusPacket: Buffer): Buffer | undefined;
-  public sendEncryptedPacket(buffer: Buffer): boolean;
+  public encryptAudioPacket(opusPacket: Uint8Array): Buffer | undefined;
+  public sendEncryptedPacket(buffer: Uint8Array): boolean;
   public setSpeaking(speaking: boolean): void;
   public decryptAudioPacket(buffer: Buffer): Buffer | undefined;
 }
+
+export function setEncryptionMethods(methods: EncryptionMethods): void;

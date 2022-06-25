@@ -1,15 +1,14 @@
 import EventEmitter from "node:events";
 
-export interface SocketConfig {
-  ip: string;
-  port: number;
-}
-
-export class VoiceUDPSocket extends EventEmitter {
-  public constructor(remote: SocketConfig);
+export default class VoiceUDPSocket extends EventEmitter {
+  public constructor(remoteIp: string, remotePort: number);
   public ping: number;
-  public readonly remote: SocketConfig;
-  public send(buffer: Buffer): void;
+  public readonly remoteIp: string;
+  public readonly remotePort: number;
+  public send(buffer: Uint8Array | string | ReadonlyArray<any>): void;
   public destroy(): void;
-  private performIPDiscovery(ssrc: number): Promise<SocketConfig>;
+  private performIPDiscovery(ssrc: number): Promise<{
+    readonly ip: string;
+    readonly port: number;
+  }>;
 }

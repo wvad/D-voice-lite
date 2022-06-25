@@ -14,11 +14,13 @@ class VoiceUDPSocket extends EventEmitter {
   #keepAliveCounter;
   #keepAliveBuffer;
   #keepAliveInterval;
-  constructor(remote) {
-    if (new.target !== VoiceUDPSocket) throw new TypeError("This class is sealed");
+  constructor(remoteIp, remotePort) {
+    if (typeof remoteIp !== "string") throw new TypeError("Remote IP must be a string");
+    if (typeof remotePort !== "number") throw new TypeError("Remote port must be a number");
     super();
     this.ping = NaN;
-    Object.defineProperty(this, "remote", { value: remote, enumerable: true });
+    Object.defineProperty(this, "remoteIp", { value: remoteIp, enumerable: true });
+    Object.defineProperty(this, "remotePort", { value: remotePort, enumerable: true });
     this.#socket = createSocket("udp4");
     this.#socket.on("error", error => this.emit("error", error));
     this.#socket.on("message", buffer => this.#onMessage(buffer));
@@ -28,10 +30,9 @@ class VoiceUDPSocket extends EventEmitter {
     this.#keepAliveBuffer = Buffer.alloc(8);
     this.#keepAliveInterval = setInterval(() => this.#keepAlive(), KEEP_ALIVE_INTERVAL);
     setImmediate(() => this.#keepAlive());
-    Object.seal(this);
   }
   send(buffer) {
-    this.#socket.send(buffer, this.remote.port, this.remote.ip);
+    this.#socket.send(buffer, this.remotePort, this.remoteIp);
   }
   destroy() {
     try {
@@ -50,9 +51,8 @@ class VoiceUDPSocket extends EventEmitter {
           const ip = packet.slice(8, packet.indexOf(0, 8)).toString("utf-8");
           if (!isIPv4(ip)) throw new Error("Malformed IP address");
           const port = packet.readUInt16BE(packet.length - 2);
-          const data = { ip, port };
           this.#socket.off("message", listener);
-          resolve(data);
+          resolve(Object.freeze({ ip, port }));
         } catch {
           // ignore error
         }

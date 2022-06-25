@@ -1,7 +1,7 @@
 "use strict";
 
 const EventEmitter = require("node:events");
-const WebSocket = require("ws");
+const WebSocket = require("./websocket");
 
 class VoiceWebSocket extends EventEmitter {
   #ws;
@@ -10,7 +10,7 @@ class VoiceWebSocket extends EventEmitter {
   #missedHeartbeats;
   #heartbeatInterval;
   constructor(address) {
-    if (new.target !== VoiceWebSocket) throw new TypeError("This class is sealed");
+    if (typeof address !== "string") throw new TypeError("Address must be a string");
     super();
     this.ping = NaN;
     this.#ws = new WebSocket(address);
@@ -21,7 +21,6 @@ class VoiceWebSocket extends EventEmitter {
     this.#lastHeartbeatAck = 0;
     this.#lastHeartbeatSend = 0;
     this.#missedHeartbeats = 0;
-    Object.seal(this);
   }
   sendPacket(packet) {
     try {

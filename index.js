@@ -1,7 +1,21 @@
 "use strict";
 
 const EventEmitter = require("node:events");
-const secretboxMethods = require("./secretbox.js");
+const secretboxMethods = (() => {
+  const fallbackError = () => {
+    throw new Error(
+      "Cannot play audio as no valid encryption package is installed.\n" +
+        "  - Install sodium, libsodium-wrappers, or tweetnacl.\n" +
+        "  - Use the generateDependencyReport() function for more information.\n"
+    );
+  };
+  return {
+    __proto__: null,
+    open: fallbackError,
+    close: fallbackError,
+    randomBytes: fallbackError
+  };
+})();
 const VoiceUDPSocket = require("./udp.js");
 const VoiceWebSocket = require("./ws.js");
 
@@ -13,6 +27,7 @@ const nonce = Buffer.alloc(24);
 
 const NetworkingStatusCode = new Proxy(
   Object.freeze({
+    __proto__: null,
     OpeningWs: "OPENING_WS",
     Identifying: "IDENTIFYING",
     UdpHandshaking: "UDP_HANDSHAKING",
@@ -22,6 +37,7 @@ const NetworkingStatusCode = new Proxy(
     Closed: "CLOSED"
   }),
   {
+    __proto__: null,
     get(target, name) {
       if (name in target) return target[name];
       throw new TypeError(`Invalid NetworkingStatusCode: ${String(name)}`);
@@ -31,6 +47,7 @@ const NetworkingStatusCode = new Proxy(
 
 const VoiceOpcode = new Proxy(
   Object.freeze({
+    __proto__: null,
     Identify: 0,
     SelectProtocol: 1,
     Ready: 2,
@@ -46,6 +63,7 @@ const VoiceOpcode = new Proxy(
     Codec: 14
   }),
   {
+    __proto__: null,
     get(target, name) {
       if (name in target) return target[name];
       throw new TypeError(`Invalid VoiceOpcode: ${String(name)}`);
@@ -53,7 +71,7 @@ const VoiceOpcode = new Proxy(
   }
 );
 
-const noop = () => {};
+const noop = Object.freeze(Object.setPrototypeOf(() => void 0, null));
 
 const randomNBit = n => Math.floor(Math.random() * 2 ** n);
 
@@ -72,14 +90,12 @@ class Networking extends EventEmitter {
   #state;
   #encryptedBuffers = new WeakSet();
   constructor(options) {
-    if (new.target !== Networking) throw new TypeError("This class is sealed");
     super();
-    this.#state = {
+    this.#state = Object.freeze({
       code: NetworkingStatusCode.OpeningWs,
       ws: createWebSocket(options.endpoint, this.#getBoundHandlers(this))
-    };
+    });
     Object.defineProperty(this, "connectionOptions", { value: options, enumerable: true });
-    Object.seal(this);
   }
   destroy() {
     this.#updateState({ code: NetworkingStatusCode.Closed });
@@ -102,7 +118,7 @@ class Networking extends EventEmitter {
       nonceBuffer.writeUInt32BE(connectionData.nonce, 0);
       preparedPacket = Buffer.concat([packetBuffer, secretboxMethods.close(opusPacket, nonceBuffer, secretKey), nonceBuffer.slice(0, 4)]);
     } else if (encryptionMode === "xsalsa20_poly1305_suffix") {
-      const random = secretboxMethods.random(24, nonceBuffer);
+      const random = secretboxMethods.randomBytes(24, nonceBuffer);
       preparedPacket = Buffer.concat([packetBuffer, secretboxMethods.close(opusPacket, random, secretKey), random]);
     } else {
       preparedPacket = Buffer.concat([packetBuffer, secretboxMethods.close(opusPacket, nonce, secretKey)]);
@@ -140,7 +156,10 @@ class Networking extends EventEmitter {
     return this.#state;
   }
   decryptAudioPacket(buffer) {
-    const { connectionData: { encryptionMode, nonceBuffer, secretKey }, code } = this.#state;
+    const {
+      connectionData: { encryptionMode, nonceBuffer, secretKey },
+      code
+    } = this.#state;
     if (code !== NetworkingStatusCode.Ready && code !== NetworkingStatusCode.Resuming) return undefined;
     if (!encryptionMode || !nonceBuffer || !secretKey) return undefined;
     let end;
@@ -193,7 +212,7 @@ class Networking extends EventEmitter {
       oldUdp.destroy();
     }
     const oldState = this.#state;
-    this.#state = newState;
+    this.#state = Object.freeze(newState);
     if (oldState.code !== newState.code) this.emit(newState.code);
     this.emit("stateChange", oldState, newState);
   }
@@ -225,37 +244,38 @@ class Networking extends EventEmitter {
     if (packet.op === VoiceOpcode.Ready && code === NetworkingStatusCode.Identifying) {
       const { onChildError, onUdpPacket, onUdpClose } = this.#getBoundHandlers(this);
       const { ip, port, ssrc, modes } = packet.d;
-      const udp = new VoiceUDPSocket({ ip, port });
+      const udp = new VoiceUDPSocket(ip, port);
       udp.on("error", onChildError);
       udp.on("message", onUdpPacket);
       udp.once("close", onUdpClose);
-      udp.performIPDiscovery(ssrc)
-      .then(localConfig => {
-        if (this.#state.code !== NetworkingStatusCode.UdpHandshaking) return;
-        const mode = modes.find(opt => SUPPORTED_ENCRYPTION_MODES.includes(opt));
-        if (!mode) throw new Error(`No compatible encryption modes. Available include: ${modes.join(", ")}`);
-        ws.sendPacket({
-          op: 1,
-          d: {
-            protocol: "udp",
-            data: {
-              address: localConfig.ip,
-              port: localConfig.port,
-              mode
+      udp
+        .performIPDiscovery(ssrc)
+        .then(localConfig => {
+          if (this.#state.code !== NetworkingStatusCode.UdpHandshaking) return;
+          const mode = modes.find(opt => SUPPORTED_ENCRYPTION_MODES.includes(opt));
+          if (!mode) throw new Error(`No compatible encryption modes. Available include: ${modes.join(", ")}`);
+          ws.sendPacket({
+            op: 1,
+            d: {
+              protocol: "udp",
+              data: {
+                address: localConfig.ip,
+                port: localConfig.port,
+                mode
+              }
             }
-          }
-        });
-        this.#updateState({
-          ...this.#state,
-          code: NetworkingStatusCode.SelectingProtocol
-        });
-      })
-      .catch(error => this.emit("error", error));
+          });
+          this.#updateState({
+            ...this.#state,
+            code: NetworkingStatusCode.SelectingProtocol
+          });
+        })
+        .catch(error => this.emit("error", error));
       this.#updateState({
         ...this.#state,
         code: NetworkingStatusCode.UdpHandshaking,
         udp,
-        connectionData: { ssrc }
+        connectionData: Object.seal({ ssrc })
       });
       return;
     }
@@ -264,7 +284,7 @@ class Networking extends EventEmitter {
       this.#updateState({
         ...this.#state,
         code: NetworkingStatusCode.Ready,
-        connectionData: {
+        connectionData: Object.seal({
           ...connectionData,
           encryptionMode,
           secretKey: new Uint8Array(secretKey),
@@ -273,7 +293,7 @@ class Networking extends EventEmitter {
           nonce: 0,
           nonceBuffer: Buffer.alloc(24),
           speaking: false
-        }
+        })
       });
       return;
     }
@@ -287,8 +307,7 @@ class Networking extends EventEmitter {
   }
   #onWsCloseUnbound({ code }) {
     const state = this.#state;
-    const canResume = code === 4015 || code < 4000;
-    if (canResume && state.code === NetworkingStatusCode.Ready) {
+    if ((code === 4015 || code < 4000) && state.code === NetworkingStatusCode.Ready) {
       this.#updateState({
         ...state,
         code: NetworkingStatusCode.Resuming,
@@ -346,4 +365,10 @@ class Networking extends EventEmitter {
 Object.freeze(Networking);
 Object.freeze(Networking.prototype);
 
-Object.assign(exports, { Networking, NetworkingStatusCode, VoiceOpcode });
+function setEncryptionMethods(methods) {
+  if (typeof methods?.open == "function") secretboxMethods.open = methods.open;
+  if (typeof methods?.close == "function") secretboxMethods.close = methods.close;
+  if (typeof methods?.randomBytes == "function") secretboxMethods.randomBytes = methods.randomBytes;
+}
+
+Object.assign(exports, { Networking, NetworkingStatusCode, VoiceOpcode, setEncryptionMethods });
