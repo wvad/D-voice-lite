@@ -9,10 +9,10 @@ class VoiceWebSocket extends EventEmitter {
   #lastHeartbeatSend = 0;
   #missedHeartbeats = 0;
   #heartbeatInterval;
-  ping = NaN;
   constructor(address) {
     if (typeof address !== "string") throw new TypeError("Address must be a string");
     super();
+    Object.defineProperty(this, "ping", { value: NaN, writable: true, enumerable: true });
     this.#ws = new WebSocket(address);
     this.#ws.onmessage = e => this.#onMessage(e);
     this.#ws.onopen = e => this.emit("open", e);

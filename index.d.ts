@@ -108,20 +108,8 @@ declare type NetworkingState =
   | NetworkingResumingState
   | NetworkingClosedState;
 
-declare interface EncryptionMethods {
-  open: (buffer: Buffer, nonceBuffer: Buffer, secretKey: Uint8Array) => Uint8Array | null;
-  close: (opusPacket: Buffer, nonceBuffer: Buffer, secretKey: Uint8Array) => Uint8Array;
-  randomBytes: (number: number, nonceBuffer: Buffer) => Uint8Array;
-}
-
 export class Networking extends EventEmitter {
-  public constructor(options: {
-    serverId: string;
-    userId: string;
-    sessionId: string;
-    token: string;
-    endpoint: string;
-  });
+  public constructor(options: { serverId: string; userId: string; sessionId: string; token: string; endpoint: string });
   public readonly serverId: string;
   public readonly userId: string;
   public readonly sessionId: string;
@@ -135,4 +123,8 @@ export class Networking extends EventEmitter {
   public decryptAudioPacket(buffer: Buffer): Buffer | undefined;
 }
 
-export function setEncryptionMethods(methods: EncryptionMethods): void;
+export function setEncryptionMethods(methods: {
+  open: (buffer: Buffer, nonceBuffer: Buffer, secretKey: Uint8Array) => Uint8Array | null;
+  close: (opusPacket: Buffer, nonceBuffer: Buffer, secretKey: Uint8Array) => Uint8Array;
+  randomBytes: (number: number, nonceBuffer: Buffer) => Uint8Array;
+}): void;

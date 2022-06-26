@@ -14,11 +14,11 @@ class VoiceUDPSocket extends EventEmitter {
   #keepAliveCounter = 0;
   #keepAliveBuffer = Buffer.alloc(8);
   #keepAliveInterval = setInterval(() => this.#keepAlive(), KEEP_ALIVE_INTERVAL);
-  ping = NaN;
   constructor(remoteIp, remotePort) {
     if (typeof remoteIp !== "string") throw new TypeError("Remote IP must be a string");
     if (typeof remotePort !== "number") throw new TypeError("Remote port must be a number");
     super();
+    Object.defineProperty(this, "ping", { value: NaN, writable: true, enumerable: true });
     Object.defineProperty(this, "remoteIp", { value: remoteIp, enumerable: true });
     Object.defineProperty(this, "remotePort", { value: remotePort, enumerable: true });
     this.#socket.on("error", error => this.emit("error", error));
