@@ -92,11 +92,16 @@ class Networking extends EventEmitter {
   #encryptedBuffers = new WeakSet();
   constructor(options) {
     super();
+    const { endpoint } = options;
     this.#state = Object.freeze({
       code: NetworkingStatusCode.OpeningWs,
-      ws: createWebSocket(options.endpoint, this.#getBoundHandlers(this))
+      ws: createWebSocket(endpoint, this.#getBoundHandlers(this))
     });
-    Object.defineProperty(this, "connectionOptions", { value: options, enumerable: true });
+    Object.defineProperty(this, "endpoint", { value: endpoint, enumerable: true });
+    Object.defineProperty(this, "serverId", { value: options.serverId, enumerable: true });
+    Object.defineProperty(this, "userId", { value: options.userId, enumerable: true });
+    Object.defineProperty(this, "sessionId", { value: options.sessionId, enumerable: true });
+    Object.defineProperty(this, "token", { value: options.token, enumerable: true });
   }
   destroy() {
     this.#updateState({ code: NetworkingStatusCode.Closed });
@@ -312,7 +317,7 @@ class Networking extends EventEmitter {
       this.#updateState({
         ...state,
         code: NetworkingStatusCode.Resuming,
-        ws: createWebSocket(this.connectionOptions.endpoint, this.#getBoundHandlers(this))
+        ws: createWebSocket(this.endpoint, this.#getBoundHandlers(this))
       });
       return;
     }
@@ -327,21 +332,20 @@ class Networking extends EventEmitter {
       this.#updateState({
         ...state,
         code: NetworkingStatusCode.Resuming,
-        ws: createWebSocket(this.connectionOptions.endpoint, this.#getBoundHandlers(this))
+        ws: createWebSocket(this.endpoint, this.#getBoundHandlers(this))
       });
     }
   }
   #onWsOpenUnbound() {
-    const { connectionOptions } = this;
     const { code, ws } = this.#state;
     if (code === NetworkingStatusCode.OpeningWs) {
       ws.sendPacket({
         op: VoiceOpcode.Identify,
         d: {
-          server_id: connectionOptions.serverId,
-          user_id: connectionOptions.userId,
-          session_id: connectionOptions.sessionId,
-          token: connectionOptions.token
+          server_id: this.serverId,
+          user_id: this.userId,
+          session_id: this.sessionId,
+          token: this.token
         }
       });
       this.#updateState({
@@ -354,9 +358,9 @@ class Networking extends EventEmitter {
       ws.sendPacket({
         op: VoiceOpcode.Resume,
         d: {
-          server_id: connectionOptions.serverId,
-          session_id: connectionOptions.sessionId,
-          token: connectionOptions.token
+          server_id: this.serverId,
+          session_id: this.sessionId,
+          token: this.token
         }
       });
     }

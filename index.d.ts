@@ -46,14 +46,6 @@ export enum VoiceOpcode {
   Codec = 14
 }
 
-declare interface ConnectionOptions {
-  serverId: string;
-  userId: string;
-  sessionId: string;
-  token: string;
-  endpoint: string;
-}
-
 declare interface ConnectionData {
   ssrc: number;
   encryptionMode: string;
@@ -122,9 +114,19 @@ declare interface EncryptionMethods {
   randomBytes: (number: number, nonceBuffer: Buffer) => Uint8Array;
 }
 
-export class Networking<T extends ConnectionOptions> extends EventEmitter {
-  public constructor(options: T);
-  public readonly connectionOptions: T;
+export class Networking extends EventEmitter {
+  public constructor(options: {
+    serverId: string;
+    userId: string;
+    sessionId: string;
+    token: string;
+    endpoint: string;
+  });
+  public readonly serverId: string;
+  public readonly userId: string;
+  public readonly sessionId: string;
+  public readonly token: string;
+  public readonly endpoint: string;
   public get state(): NetworkingState;
   public destroy(): void;
   public encryptAudioPacket(opusPacket: Uint8Array): Buffer | undefined;
