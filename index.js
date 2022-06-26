@@ -72,7 +72,7 @@ const secretboxMethods = (() => {
   };
 })();
 
-const noop = Object.freeze(Object.setPrototypeOf(() => void 0, null));
+const noop = () => void 0;
 
 const randomNBit = n => Math.floor(Math.random() * 2 ** n);
 
@@ -238,7 +238,7 @@ class Networking extends EventEmitter {
     const ssrc = msg.readUInt32BE(8);
     this.emit("udpPacket", { ssrc, encryptedBuffer: msg });
   }
-  #onWsPacketUnbound(packet) {
+  async #onWsPacketUnbound(packet) {
     setImmediate(() => this.emit("wsMessage", packet));
     setImmediate(() => this.emit(`op:${packet.op}`, packet.d));
     const { ws, code, connectionData } = this.#state;
@@ -249,35 +249,35 @@ class Networking extends EventEmitter {
       udp.on("error", onChildError);
       udp.on("message", onUdpPacket);
       udp.once("close", onUdpClose);
-      udp
-        .performIPDiscovery(ssrc)
-        .then(localConfig => {
-          if (this.#state.code !== NetworkingStatusCode.UdpHandshaking) return;
-          const mode = modes.find(opt => SUPPORTED_ENCRYPTION_MODES.includes(opt));
-          if (!mode) throw new Error(`No compatible encryption modes. Available include: ${modes.join(", ")}`);
-          ws.sendPacket({
-            op: 1,
-            d: {
-              protocol: "udp",
-              data: {
-                address: localConfig.ip,
-                port: localConfig.port,
-                mode
-              }
-            }
-          });
-          this.#updateState({
-            ...this.#state,
-            code: NetworkingStatusCode.SelectingProtocol
-          });
-        })
-        .catch(error => this.emit("error", error));
       this.#updateState({
         ...this.#state,
         code: NetworkingStatusCode.UdpHandshaking,
         udp,
         connectionData: Object.seal({ ssrc })
       });
+      try {
+        const localConfig = await udp.performIPDiscovery(ssrc);
+        if (this.#state.code !== NetworkingStatusCode.UdpHandshaking) return;
+        const mode = modes.find(opt => SUPPORTED_ENCRYPTION_MODES.includes(opt));
+        if (!mode) throw new Error(`No compatible encryption modes. Available include: ${modes.join(", ")}`);
+        ws.sendPacket({
+          op: 1,
+          d: {
+            protocol: "udp",
+            data: {
+              address: localConfig.ip,
+              port: localConfig.port,
+              mode
+            }
+          }
+        });
+        this.#updateState({
+          ...this.#state,
+          code: NetworkingStatusCode.SelectingProtocol
+        });
+      } catch (error) {
+        this.emit("error", error);
+      }
       return;
     }
     if (packet.op === VoiceOpcode.SessionDescription && code === NetworkingStatusCode.SelectingProtocol) {
